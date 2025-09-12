@@ -41,8 +41,6 @@ def create_vector_store_from_db_chunks(chunks_from_db):
     return vector_store
 
 def get_qa_chain(vector_store):
-    # --- PROMPT TEMPLATE CHANGE ---
-    # The new prompt is more direct and instructs the AI to not mention the context.
     prompt_template = """
     You are an expert on the provided document. Your task is to answer the user's question using only the information from the context below.
     Be direct, concise, and helpful. Do not mention the words "context", "document", or "text" in your answer. Just provide the answer directly.
@@ -59,12 +57,12 @@ def get_qa_chain(vector_store):
     prompt = PromptTemplate(
         template=prompt_template, input_variables=["context", "question"]
     )
-    
+
     chain = RetrievalQA.from_chain_type(
         llm=llm,
         chain_type="stuff",
         retriever=vector_store.as_retriever(search_kwargs={'k': 3}),
-        return_source_documents=False,
+        return_source_documents=True,  # This is the important change
         chain_type_kwargs={"prompt": prompt}
     )
     return chain

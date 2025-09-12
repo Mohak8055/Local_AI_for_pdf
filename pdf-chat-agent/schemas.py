@@ -8,8 +8,7 @@ class PDFBase(BaseModel):
 class PDF(PDFBase):
     id: int
     userId: int
-    
-    # FIX: Changed from orm_mode = True
+
     model_config = ConfigDict(from_attributes=True)
 
 # --- User Schemas ---
@@ -22,10 +21,9 @@ class UserCreate(UserBase):
 class User(UserBase):
     id: int
     pdfs: List[PDF] = []
-    
-    # FIX: Changed from orm_mode = True
+
     model_config = ConfigDict(from_attributes=True)
-        
+
 # --- Token Schemas ---
 class Token(BaseModel):
     access_token: str
@@ -33,3 +31,14 @@ class Token(BaseModel):
 
 class TokenData(BaseModel):
     username: str | None = None
+
+# --- Feedback Schema ---
+class FeedbackCreate(BaseModel):
+    question: str
+    answer: str
+    is_helpful: bool
+
+# --- Source Document Schema ---
+class SourceDocument(BaseModel):
+    file_name: str
+    page_content: str
