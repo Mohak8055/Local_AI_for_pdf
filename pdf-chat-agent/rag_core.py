@@ -1,5 +1,4 @@
-from langchain_community.llms import Ollama
-# FIX: Import from the new, correct package
+from langchain_ollama import OllamaLLM
 from langchain_huggingface import HuggingFaceEmbeddings
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_community.vectorstores import FAISS
@@ -7,38 +6,47 @@ from langchain.chains import RetrievalQA
 from langchain.prompts import PromptTemplate
 from pdfminer.high_level import extract_text
 import io
+import json
 
 # --- Configuration ---
-# FIX: Use the standard model name for Python's sentence-transformers
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
 OLLAMA_MODEL = "llama3"
 
-embeddings = HuggingFaceEmbeddings(model_name=MODEL_NAME)
-llm = Ollama(model=OLLAMA_MODEL)
+embeddings_model = HuggingFaceEmbeddings(model_name=MODEL_NAME)
+llm = OllamaLLM(model=OLLAMA_MODEL)
+text_splitter = RecursiveCharacterTextSplitter(
+    chunk_size=1000,
+    chunk_overlap=200,
+    length_function=len
+)
 
-# This will store vector stores in memory, keyed by userId
-user_vector_stores = {}
+# --- Core RAG Functions ---
 
-# --- RAG Functions ---
-def process_pdf_to_chunks(pdf_bytes: bytes):
-    text = extract_text(io.BytesIO(pdf_bytes))
-    text_splitter = RecursiveCharacterTextSplitter(
-        chunk_size=1000,
-        chunk_overlap=200,
-        length_function=len
-    )
-    chunks = text_splitter.split_text(text)
-    return chunks
+def get_text_from_pdf(pdf_bytes: bytes) -> str:
+    return extract_text(io.BytesIO(pdf_bytes))
 
-def get_vector_store(text_chunks: list):
-    vector_store = FAISS.from_texts(texts=text_chunks, embedding=embeddings)
+def get_text_chunks(text: str) -> list[str]:
+    return text_splitter.split_text(text)
+
+def get_embeddings(chunks: list[str]) -> list[list[float]]:
+    return embeddings_model.embed_documents(chunks)
+
+def create_vector_store_from_db_chunks(chunks_from_db):
+    if not chunks_from_db:
+        return None
+    texts = [chunk.content for chunk in chunks_from_db]
+    embeddings_list = [json.loads(chunk.embedding) for chunk in chunks_from_db]
+    text_embedding_pairs = list(zip(texts, embeddings_list))
+    vector_store = FAISS.from_embeddings(text_embeddings=text_embedding_pairs, embedding=embeddings_model)
     return vector_store
 
 def get_qa_chain(vector_store):
+    # --- PROMPT TEMPLATE CHANGE ---
+    # The new prompt is more direct and instructs the AI to not mention the context.
     prompt_template = """
-    You are an intelligent assistant. Answer the user's question based ONLY on the following context.
+    You are an expert on the provided document. Your task is to answer the user's question using only the information from the context below.
+    Be direct, concise, and helpful. Do not mention the words "context", "document", or "text" in your answer. Just provide the answer directly.
     If the information is not in the context, say "I don't have enough information from the documents to answer that."
-    Do not use any prior knowledge. Be concise and helpful.
 
     CONTEXT:
     {context}
