@@ -1,0 +1,15 @@
+# Dependencies
+node_modules
+
+# Database
+# IMPORTANT: Never commit your database file to a public repository
+local-rag-db.sqlite
+
+# Logs
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+
+# Environment Variables
+# If you ever add a .env file, it should be ignored
+.env

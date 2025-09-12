@@ -1,0 +1,28 @@
+{
+  "name": "pdf-chat-backend-secure-sqlite",
+  "version": "2.0.0",
+  "description": "Secure backend for the local PDF chat agent with SQLite and Auth",
+  "main": "server.js",
+  "type": "module",
+  "scripts": {
+    "start": "node server.js"
+  },
+  "keywords": [],
+  "author": "",
+  "license": "ISC",
+  "dependencies": {
+    "@cyber2024/pdf-parse-fixed": "^1.0.1",
+    "@langchain/community": "^0.0.54",
+    "@xenova/transformers": "^2.17.1",
+    "bcrypt": "^5.1.1",
+    "cors": "^2.8.5",
+    "express": "^4.19.2",
+    "jsonwebtoken": "^9.0.2",
+    "langchain": "^0.1.37",
+    "multer": "^1.4.5-lts.1",
+    "sqlite": "^5.1.1",
+    "sqlite3": "^5.1.7",
+    "swagger-jsdoc": "^6.2.8",
+    "swagger-ui-express": "^5.0.0"
+  }
+}
