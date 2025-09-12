@@ -6,26 +6,35 @@ const Login = ({ onLoginSuccess }) => {
     const [error, setError] = useState('');
     const [isLoading, setIsLoading] = useState(false);
 
+    // API now runs on port 8000
+    const API_BASE_URL = 'http://localhost:8000';
+
     const handleSubmit = async (e) => {
         e.preventDefault();
         setError('');
         setIsLoading(true);
 
         try {
-            const response = await fetch('http://localhost:3001/auth/login', {
+            // FastAPI's OAuth2 expects 'x-www-form-urlencoded' data, not JSON.
+            const formBody = new URLSearchParams();
+            formBody.append('username', username);
+            formBody.append('password', password);
+
+            const response = await fetch(`${API_BASE_URL}/auth/login`, {
                 method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password }),
+                headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+                body: formBody,
             });
 
             const data = await response.json();
 
             if (!response.ok) {
-                throw new Error(data.error || 'Login failed. Please check your credentials.');
+                // FastAPI sends errors in a 'detail' field.
+                throw new Error(data.detail || 'Login failed. Please check your credentials.');
             }
 
-            // On success, call the function passed from App.jsx
-            onLoginSuccess(data.token);
+            // The token is now in a property called 'access_token'.
+            onLoginSuccess(data.access_token);
 
         } catch (err) {
             setError(err.message);
@@ -86,7 +95,7 @@ const Login = ({ onLoginSuccess }) => {
                     </div>
                 </form>
                  <p className="text-xs text-center text-gray-500">
-                    Need an account? Create one via the <a href="http://localhost:3001/api-docs" target="_blank" rel="noopener noreferrer" className="font-medium text-cyan-400 hover:text-cyan-300">Swagger API documentation</a>.
+                    Need an account? Create one via the <a href="http://localhost:8000/docs" target="_blank" rel="noopener noreferrer" className="font-medium text-cyan-400 hover:text-cyan-300">FastAPI documentation</a>.
                 </p>
             </div>
         </div>

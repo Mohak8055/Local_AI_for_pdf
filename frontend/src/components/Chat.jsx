@@ -1,7 +1,6 @@
 import React, { useState, useEffect, useRef } from 'react';
 
 // --- SVG Icon Components ---
-// These are helper components used within the Chat UI.
 const UserIcon = () => (
     <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gray-700 flex items-center justify-center">
         <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
@@ -39,9 +38,9 @@ const Chat = ({ token, onLogout }) => {
     const chatEndRef = useRef(null);
     const fileInputRef = useRef(null);
     
-    const API_BASE_URL = 'http://localhost:3001/api';
+    // API now runs on port 8000
+    const API_BASE_URL = 'http://localhost:8000/api';
     
-    // Function to fetch the list of PDFs for the current user
     const fetchUserPdfs = async () => {
         try {
             const response = await fetch(`${API_BASE_URL}/pdfs`, {
@@ -60,12 +59,10 @@ const Chat = ({ token, onLogout }) => {
         }
     };
 
-    // Fetch PDFs when the component first loads
     useEffect(() => {
         fetchUserPdfs();
     }, [token]);
 
-    // Automatically scroll to the bottom of the chat on new messages
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
     }, [messages, isBotTyping]);
@@ -78,7 +75,8 @@ const Chat = ({ token, onLogout }) => {
         setError('');
 
         const formData = new FormData();
-        formData.append('pdf', file);
+        // FastAPI endpoint expects the key to be 'file'
+        formData.append('file', file);
 
         try {
             const response = await fetch(`${API_BASE_URL}/upload`, {
@@ -89,7 +87,8 @@ const Chat = ({ token, onLogout }) => {
 
             if (!response.ok) {
                 const errData = await response.json();
-                throw new Error(errData.error || 'Failed to upload PDF.');
+                // FastAPI sends errors in a 'detail' field
+                throw new Error(errData.detail || 'Failed to upload PDF.');
             }
             
             setMessages(prev => [...prev, { sender: 'bot', text: `Successfully processed "${file.name}". Your knowledge base is updated.`}]);
@@ -117,18 +116,20 @@ const Chat = ({ token, onLogout }) => {
         setError('');
 
         try {
-            const response = await fetch(`${API_BASE_URL}/ask`, {
-                method: 'POST',
+            // FastAPI expects the question as a URL query parameter for this endpoint.
+            const response = await fetch(`${API_BASE_URL}/ask?question=${encodeURIComponent(question)}`, {
+                method: 'POST', // The method is still POST
                 headers: {
-                    'Content-Type': 'application/json',
+                    'Accept': 'application/json',
                     'Authorization': `Bearer ${token}`
                 },
-                body: JSON.stringify({ question }),
+                // No body is needed for this POST request anymore
             });
 
             if (!response.ok) {
                  const errData = await response.json();
-                throw new Error(errData.error || 'Failed to get an answer.');
+                // FastAPI sends errors in a 'detail' field
+                throw new Error(errData.detail || 'Failed to get an answer.');
             }
 
             const data = await response.json();
