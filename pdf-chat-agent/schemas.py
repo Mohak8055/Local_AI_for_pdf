@@ -1,44 +1,55 @@
-from pydantic import BaseModel, ConfigDict
-from typing import List
+from pydantic import BaseModel
+from typing import List, Optional
 
-# --- PDF Schemas ---
+class QuestionRequest(BaseModel):
+    pdf_id: int
+    question: str
+
+class ChunkBase(BaseModel):
+    chunk_index: int
+    content: str
+
+class ChunkCreate(ChunkBase):
+    pass
+
+class Chunk(ChunkBase):
+    id: int
+    pdf_id: int
+
+    class Config:
+        from_attributes = True
+
 class PDFBase(BaseModel):
-    fileName: str
+    filename: str
+
+class PDFCreate(PDFBase):
+    pass
 
 class PDF(PDFBase):
     id: int
-    userId: int
+    owner_id: int
+    chunks: List[Chunk] = []
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
-# --- User Schemas ---
 class UserBase(BaseModel):
-    username: str
+    email: str
 
 class UserCreate(UserBase):
     password: str
 
 class User(UserBase):
     id: int
+    is_active: bool
     pdfs: List[PDF] = []
 
-    model_config = ConfigDict(from_attributes=True)
+    class Config:
+        from_attributes = True
 
-# --- Token Schemas ---
 class Token(BaseModel):
     access_token: str
     token_type: str
 
 class TokenData(BaseModel):
-    username: str | None = None
-
-# --- Feedback Schema ---
-class FeedbackCreate(BaseModel):
-    question: str
-    answer: str
-    is_helpful: bool
-
-# --- Source Document Schema ---
-class SourceDocument(BaseModel):
-    file_name: str
-    page_content: str
+    email: Optional[str] = None

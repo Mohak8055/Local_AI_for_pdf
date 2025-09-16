@@ -3,7 +3,7 @@ node_modules
 
 # Database
 # IMPORTANT: Never commit your database file to a public repository
-local-rag-db.sqlite
+test.db
 
 # Logs
 npm-debug.log*

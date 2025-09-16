@@ -8,9 +8,10 @@ from pdfminer.high_level import extract_text
 import io
 import json
 import torch
-from faster_whisper import WhisperModel
 import translators as ts
 import logging
+from faster_whisper import WhisperModel
+import os
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO)
@@ -18,7 +19,7 @@ logger = logging.getLogger(__name__)
 
 # --- Configuration ---
 MODEL_NAME = "sentence-transformers/all-MiniLM-L6-v2"
-OLLAMA_MODEL = "llama3"
+OLLAMA_MODEL = "tinyllama"
 WHISPER_MODEL = "large-v3"
 
 # --- Device Configuration for PyTorch ---
@@ -53,16 +54,17 @@ def create_vector_store_from_db_chunks(chunks_from_db):
     if not chunks_from_db:
         return None
     texts = [chunk.content for chunk in chunks_from_db]
-    embeddings_list = [json.loads(chunk.embedding) for chunk in chunks_from_db]
+    embeddings_list = [chunk.embedding for chunk in chunks_from_db]
     text_embedding_pairs = list(zip(texts, embeddings_list))
     vector_store = FAISS.from_embeddings(text_embeddings=text_embedding_pairs, embedding=embeddings_model)
     return vector_store
 
 def get_qa_chain(vector_store):
+    # --- PROMPT UPDATED FOR PRECISION ---
     prompt_template = """
-    You are an expert on the provided document. Your task is to answer the user's question using only the information from the context below.
-    Be direct, concise, and helpful. Do not mention the words "context", "document", or "text" in your answer. Just provide the answer directly.
-    If the information is not in the context, say "I don't have enough information from the documents to answer that."
+    You are an expert Q&A system. Your task is to answer the user's question with a brief and precise answer, using only the information from the context below.
+    Provide a direct answer. Do not repeat the question or use unnecessary filler words.
+    If the information is not in the context, say "The answer is not available in the document."
 
     CONTEXT:
     {context}
@@ -87,34 +89,24 @@ def get_qa_chain(vector_store):
 
 # --- Audio and Translation Functions ---
 
-def transcribe_audio(audio_bytes: bytes) -> tuple[str, str]:
-    """
-    Transcribes audio using Whisper and detects the language.
-    """
-    audio_file = io.BytesIO(audio_bytes)
-    segments, info = whisper_model.transcribe(audio_file, beam_size=5)
-    
+def transcribe_audio(audio_path: str) -> tuple[str, str]:
+    segments, info = whisper_model.transcribe(audio_path, beam_size=5)
     detected_language = info.language
     transcribed_text = "".join(segment.text for segment in segments)
-    
     logger.info(f"Detected language: {detected_language}, Transcribed text: {transcribed_text}")
-    
     return transcribed_text, detected_language
 
 def translate_text(text: str, target_language: str, source_language: str = 'auto') -> str:
-    """
-    Translates text to the target language.
-    """
-    if source_language == target_language:
+    if not text or source_language == target_language:
         return text
     try:
         translated_text = ts.translate_text(
-            text, 
-            from_language=source_language, 
+            text,
+            from_language=source_language,
             to_language=target_language
         )
         logger.info(f"Translating from '{source_language}' to '{target_language}': '{text}' -> '{translated_text}'")
         return translated_text
     except Exception as e:
         logger.error(f"Translation error from '{source_language}' to '{target_language}': {e}")
-        return text # Fallback to original text if translation fails
+        return text
