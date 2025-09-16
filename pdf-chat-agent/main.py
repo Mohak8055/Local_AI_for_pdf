@@ -13,7 +13,7 @@ app = FastAPI(title="Local AI PDF Agent API")
 
 origins = [
     "http://localhost:5173",
-    "http://127.0.0.1:5173",
+    "http://12-7.0.0.1:5173",
 ]
 
 app.add_middleware(
@@ -145,3 +145,66 @@ async def give_feedback(
     db.add(new_feedback)
     db.commit()
     return {"message": "Feedback received. Thank you!"}
+
+@app.post("/api/ask_voice")
+async def ask_voice(
+    file: UploadFile = File(...),
+    token: str = Query(...),
+    db: Session = Depends(database.get_db)
+):
+    current_user = await get_user_from_token(token, db)
+    
+    try:
+        audio_bytes = await file.read()
+        transcribed_text, detected_language = rag_core.transcribe_audio(audio_bytes)
+
+        # Since the RAG model is English-based, we translate the question to English
+        question_in_english = rag_core.translate_text(
+            transcribed_text, 
+            target_language='en', 
+            source_language=detected_language
+        )
+
+        # The rest of this logic is similar to the '/api/ask' endpoint
+        user_pdfs = db.query(database.PDF).filter(database.PDF.userId == current_user.id).all()
+        if not user_pdfs:
+            raise HTTPException(status_code=404, detail="No documents uploaded. Please upload a PDF first.")
+
+        pdf_ids = [pdf.id for pdf in user_pdfs]
+        all_user_chunks = db.query(database.Chunk).filter(database.Chunk.pdfId.in_(pdf_ids)).all()
+        if not all_user_chunks:
+            raise HTTPException(status_code=404, detail="Could not find processed data for your documents.")
+
+        vector_store = rag_core.create_vector_store_from_db_chunks(all_user_chunks)
+        if not vector_store:
+             raise HTTPException(status_code=500, detail="Failed to build knowledge base from your documents.")
+
+        qa_chain = rag_core.get_qa_chain(vector_store)
+        result = qa_chain.invoke({"query": question_in_english})
+        answer_in_english = result["result"]
+
+        # Translate the answer back to the original language
+        final_answer = rag_core.translate_text(
+            answer_in_english, 
+            target_language=detected_language, 
+            source_language='en'
+        )
+
+        source_documents_data = []
+        if "source_documents" in result:
+            for doc in result["source_documents"]:
+                chunk = db.query(database.Chunk).filter(database.Chunk.content == doc.page_content).first()
+                if chunk:
+                     pdf = db.query(database.PDF).filter(database.PDF.id == chunk.pdfId).first()
+                     if pdf:
+                        source_documents_data.append({"file_name": pdf.fileName, "page_content": doc.page_content, "pdf_id": pdf.id})
+
+        return {
+            "question": transcribed_text,
+            "answer": final_answer,
+            "sources": source_documents_data
+        }
+
+    except Exception as e:
+        print(f"Error during voice processing: {e}")
+        raise HTTPException(status_code=500, detail=f"An error occurred: {e}")

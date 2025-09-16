@@ -14,3 +14,8 @@ sentence-transformers
 pdfminer.six
 faiss-cpu
 sse-starlette
+faster-whisper
+torch
+torchaudio
+librosa
+translators
