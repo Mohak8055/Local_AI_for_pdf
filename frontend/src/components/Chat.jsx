@@ -35,6 +35,12 @@ const ThumbsDownIcon = () => (
         <path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326.02.485.06L17 4m-7 10v5a2 2 0 002 2h.085a2 2 0 001.736-.97l2.714-4.887M17 4h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
     </svg>
 );
+const MicrophoneIcon = ({ isRecording }) => (
+    <svg xmlns="http://www.w3.org/2000/svg" className={`w-6 h-6 ${isRecording ? 'text-red-500' : ''}`} viewBox="0 0 24 24" fill="currentColor">
+        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z" />
+    </svg>
+);
+
 
 // --- Main Chat Component ---
 const Chat = ({ token, onLogout }) => {
@@ -45,6 +51,12 @@ const Chat = ({ token, onLogout }) => {
     const [error, setError] = useState('');
     const [userPdfs, setUserPdfs] = useState([]);
     
+    // --- New state for voice recording ---
+    const [isRecording, setIsRecording] = useState(false);
+    const [isProcessingVoice, setIsProcessingVoice] = useState(false); // New state for loading indicator
+    const mediaRecorderRef = useRef(null);
+    const audioChunksRef = useRef([]);
+
     const chatEndRef = useRef(null);
     const fileInputRef = useRef(null);
     const eventSourceRef = useRef(null);
@@ -80,7 +92,72 @@ const Chat = ({ token, onLogout }) => {
 
     useEffect(() => {
         chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isBotTyping]);
+    }, [messages, isBotTyping, isProcessingVoice]);
+    
+    // --- New functions for voice recording ---
+    
+    const handleVoiceRecording = () => {
+        if (isRecording) {
+            mediaRecorderRef.current.stop();
+            setIsRecording(false);
+        } else {
+            navigator.mediaDevices.getUserMedia({ audio: true })
+                .then(stream => {
+                    const mediaRecorder = new MediaRecorder(stream);
+                    mediaRecorderRef.current = mediaRecorder;
+                    audioChunksRef.current = [];
+
+                    mediaRecorder.ondataavailable = event => {
+                        audioChunksRef.current.push(event.data);
+                    };
+
+                    mediaRecorder.onstop = async () => {
+                        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+                        sendAudioToServer(audioBlob);
+                    };
+                    
+                    mediaRecorder.start();
+                    setIsRecording(true);
+                })
+                .catch(err => {
+                    setError("Microphone access was denied. Please allow access to use this feature.");
+                    console.error("Error accessing microphone:", err);
+                });
+        }
+    };
+
+    const sendAudioToServer = async (audioBlob) => {
+        const formData = new FormData();
+        formData.append('file', audioBlob, 'recording.wav');
+
+        setIsProcessingVoice(true); // Start loading indicator
+        setError('');
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/ask_voice?token=${encodeURIComponent(token)}`, {
+                method: 'POST',
+                body: formData,
+            });
+            
+            if (!response.ok) {
+                const errData = await response.json();
+                throw new Error(errData.detail || 'Failed to process audio.');
+            }
+
+            const data = await response.json();
+
+            const userMessage = { id: Date.now(), sender: 'user', text: data.question };
+            const botMessage = { id: Date.now() + 1, sender: 'bot', text: data.answer, sources: data.sources };
+
+            setMessages(prev => [...prev, userMessage, botMessage]);
+
+        } catch (err) {
+            setError(`Voice Error: ${err.message}`);
+        } finally {
+            setIsProcessingVoice(false); // Stop loading indicator
+        }
+    };
+
 
     const handleFileChange = async (event) => {
         const file = event.target.files[0];
@@ -119,7 +196,7 @@ const Chat = ({ token, onLogout }) => {
 
     const handleSendMessage = async (e) => {
         e.preventDefault();
-        if (!userInput.trim() || isBotTyping || isUploading) return;
+        if (!userInput.trim() || isBotTyping || isUploading || isProcessingVoice) return;
     
         const question = userInput;
         const userMessage = { id: Date.now(), sender: 'user', text: userInput };
@@ -254,7 +331,7 @@ const Chat = ({ token, onLogout }) => {
                                        ))}
                                    </div>
                                )}
-                               {msg.sender === 'bot' && msg.text && !isBotTyping && (
+                               {msg.sender === 'bot' && msg.text && !isBotTyping && !isProcessingVoice && (
                                    <div className="flex gap-2 mt-2">
                                        <button onClick={() => handleFeedback(msg.id, true)} className={`p-1 rounded-full ${msg.feedback === true ? 'bg-green-500 text-white' : 'hover:bg-gray-600'}`} title="Helpful" aria-label="Helpful" disabled={msg.feedback !== undefined}><ThumbsUpIcon /></button>
                                        <button onClick={() => handleFeedback(msg.id, false)} className={`p-1 rounded-full ${msg.feedback === false ? 'bg-red-500 text-white' : 'hover:bg-gray-600'}`} title="Not Helpful" aria-label="Not Helpful" disabled={msg.feedback !== undefined}><ThumbsDownIcon /></button>
@@ -264,6 +341,22 @@ const Chat = ({ token, onLogout }) => {
                             {msg.sender === 'user' && <UserIcon />}
                         </div>
                     ))}
+
+                    {/* New Loading Indicator for Voice Processing */}
+                    {isProcessingVoice && (
+                        <div className="flex items-start gap-3 justify-start">
+                            <BotIcon />
+                            <div className="max-w-xl p-4 rounded-xl shadow-md bg-gray-700 rounded-bl-none">
+                                <div className="flex items-center space-x-1">
+                                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-75"></span>
+                                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-150"></span>
+                                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-300"></span>
+                                    <span className="ml-2 text-gray-300">Processing audio...</span>
+                                </div>
+                            </div>
+                        </div>
+                    )}
+
                     <div ref={chatEndRef} />
                 </main>
                 <footer className="p-4 bg-gray-900/80 backdrop-blur-sm border-t border-cyan-500/20">
@@ -278,16 +371,27 @@ const Chat = ({ token, onLogout }) => {
                                 onChange={(e) => setUserInput(e.target.value)}
                                 placeholder="Ask a question about your documents..."
                                 className="flex-1 p-3 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:bg-gray-800 disabled:cursor-not-allowed"
-                                disabled={isBotTyping || isUploading || userPdfs.length === 0}
+                                disabled={isBotTyping || isUploading || userPdfs.length === 0 || isProcessingVoice}
                             />
                              <button
                                 type="submit"
                                 className="p-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-cyan-600 hover:to-blue-700"
-                                disabled={isBotTyping || isUploading || !userInput.trim()}
+                                disabled={isBotTyping || isUploading || !userInput.trim() || isProcessingVoice}
                                 title="Send Message"
                                 aria-label="Send Message"
                             >
                                 <SendIcon />
+                            </button>
+                            { /* --- New Voice Input Button --- */ }
+                            <button
+                                type="button"
+                                onClick={handleVoiceRecording}
+                                className={`p-3 rounded-lg ${isRecording ? 'bg-red-600' : 'bg-gray-600'} hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed`}
+                                disabled={isBotTyping || isUploading || userPdfs.length === 0 || isProcessingVoice}
+                                title={isRecording ? "Stop Recording" : "Start Recording"}
+                                aria-label={isRecording ? "Stop Recording" : "Start Recording"}
+                            >
+                                <MicrophoneIcon isRecording={isRecording} />
                             </button>
                         </form>
                     </div>
