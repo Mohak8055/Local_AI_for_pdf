@@ -1,34 +1,29 @@
 import React, { useState } from 'react';
+import { Routes, Route, useNavigate } from 'react-router-dom';
 import Login from './components/Login';
 import Chat from './components/Chat';
+import Register from './components/Register';
 
 function App() {
-    // Check localStorage for an existing token to maintain the session
-    const [token, setToken] = useState(localStorage.getItem('authToken'));
+  const [token, setToken] = useState(localStorage.getItem('token'));
+  const navigate = useNavigate();
 
-    // This function is passed to the Login component
-    // It updates the token in state and localStorage upon successful login
-    const handleLoginSuccess = (newToken) => {
-        localStorage.setItem('authToken', newToken);
-        setToken(newToken);
-    };
+  const handleSetToken = (token) => {
+    localStorage.setItem('token', token);
+    setToken(token);
+    navigate('/chat');
+  };
 
-    // This function is passed to the Chat component
-    // It clears the token from state and localStorage to log the user out
-    const handleLogout = () => {
-        localStorage.removeItem('authToken');
-        setToken(null);
-    };
-
-    return (
-        <div className="h-screen w-screen bg-gray-800">
-            {token ? (
-                <Chat token={token} onLogout={handleLogout} />
-            ) : (
-                <Login onLoginSuccess={handleLoginSuccess} />
-            )}
-        </div>
-    );
+  return (
+    <div>
+      <Routes>
+        <Route path="/login" element={<Login setToken={handleSetToken} />} />
+        <Route path="/register" element={<Register />} />
+        <Route path="/chat" element={<Chat token={token} />} />
+        <Route path="/" element={<Login setToken={handleSetToken} />} />
+      </Routes>
+    </div>
+  );
 }
 
 export default App;

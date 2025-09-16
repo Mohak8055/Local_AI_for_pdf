@@ -1,403 +1,224 @@
 import React, { useState, useEffect, useRef } from 'react';
+import axios from 'axios';
 
-// --- SVG Icon Components ---
-const UserIcon = () => (
-    <div className="w-8 h-8 flex-shrink-0 rounded-full bg-gray-700 flex items-center justify-center">
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M16 7a4 4 0 11-8 0 4 4 0 018 0zM12 14a7 7 0 00-7 7h14a7 7 0 00-7-7z" />
-        </svg>
-    </div>
-);
-const BotIcon = () => (
-    <div className="w-8 h-8 flex-shrink-0 rounded-full bg-cyan-800 flex items-center justify-center">
-        <svg xmlns="http://www.w3.org/2000/svg" className="w-5 h-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-            <path strokeLinecap="round" strokeLinejoin="round" d="M9.75 17L9 20l-1 1h8l-1-1-.75-3M3 13h18M5 17h14a2 2 0 002-2V5a2 2 0 00-2-2H5a2 2 0 00-2 2v10a2 2 0 002 2z" />
-        </svg>
-    </div>
-);
-const SendIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="w-6 h-6" viewBox="0 0 24 24" fill="currentColor">
-        <path d="M2.01 21L23 12 2.01 3 2 10l15 2-15 2z" />
+// --- NEW: Loading Spinner Component ---
+const Spinner = () => (
+    <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
+        <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
+        <path className="opacity-75" fill="currentColor" d="M4 12a8 8 0 018-8V0C5.373 0 0 5.373 0 12h4zm2 5.291A7.962 7.962 0 014 12H0c0 3.042 1.135 5.824 3 7.938l3-2.647z"></path>
     </svg>
 );
-const LogoutIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-6 w-6" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" />
-    </svg>
-);
-const ThumbsUpIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M14 10h4.764a2 2 0 011.789 2.894l-3.5 7A2 2 0 0115.263 21h-4.017c-.163 0-.326-.02-.485-.06L7 20m7-10V5a2 2 0 00-2-2h-.085a2 2 0 00-1.736.97l-2.714 4.887M7 20H5a2 2 0 01-2-2v-6a2 2 0 012-2h2.5" />
-    </svg>
-);
-const ThumbsDownIcon = () => (
-    <svg xmlns="http://www.w3.org/2000/svg" className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M10 14H5.236a2 2 0 01-1.789-2.894l3.5-7A2 2 0 018.738 3h4.017c.163 0 .326.02.485.06L17 4m-7 10v5a2 2 0 002 2h.085a2 2 0 001.736-.97l2.714-4.887M17 4h2a2 2 0 012 2v6a2 2 0 01-2 2h-2.5" />
-    </svg>
-);
-const MicrophoneIcon = ({ isRecording }) => (
-    <svg xmlns="http://www.w3.org/2000/svg" className={`w-6 h-6 ${isRecording ? 'text-red-500' : ''}`} viewBox="0 0 24 24" fill="currentColor">
-        <path d="M12 14c1.66 0 3-1.34 3-3V5c0-1.66-1.34-3-3-3S9 3.34 9 5v6c0 1.66 1.34 3 3 3zm5.3-3c0 3-2.54 5.1-5.3 5.1S6.7 14 6.7 11H5c0 3.41 2.72 6.23 6 6.72V21h2v-3.28c3.28-.49 6-3.31 6-6.72h-1.7z" />
+
+// Microphone Icon Component
+const MicIcon = ({ isRecording }) => (
+    <svg
+        xmlns="http://www.w3.org/2000/svg"
+        viewBox="0 0 24 24"
+        fill="currentColor"
+        className={`w-6 h-6 ${isRecording ? 'text-red-500 animate-pulse' : 'text-gray-500'}`}
+    >
+        <path d="M8.25 4.5a3.75 3.75 0 1 1 7.5 0v8.25a3.75 3.75 0 1 1-7.5 0V4.5Z" />
+        <path d="M6 15a1.5 1.5 0 0 0-1.5 1.5v.092a4.502 4.502 0 0 0 4.125 4.406 4.48 4.48 0 0 0 4.758 0A4.502 4.502 0 0 0 19.5 16.592V16.5A1.5 1.5 0 0 0 18 15h-.092a4.502 4.502 0 0 0-4.406 4.125 4.48 4.48 0 0 0 0 4.758A4.502 4.502 0 0 0 15.092 18H15a1.5 1.5 0 0 0-1.5-1.5H9a1.5 1.5 0 0 0-1.5 1.5h-.092a4.502 4.502 0 0 0-4.406-4.125 4.48 4.48 0 0 0-4.758 0A4.502 4.502 0 0 0 1.5 15.092V15A1.5 1.5 0 0 0 3 13.5h.092a4.502 4.502 0 0 0 4.125 4.406 4.48 4.48 0 0 0 4.758 0A4.502 4.502 0 0 0 16.592 12H16.5a1.5 1.5 0 0 0-1.5-1.5H12a1.5 1.5 0 0 0-1.5 1.5H9.092a4.502 4.502 0 0 0-4.125-4.406 4.48 4.48 0 0 0-4.758 0A4.502 4.502 0 0 0 .092 12H0a1.5 1.5 0 0 0-1.5 1.5v.092a4.502 4.502 0 0 0 4.125 4.406 4.48 4.48 0 0 0 4.758 0A4.502 4.502 0 0 0 12 19.592V19.5a1.5 1.5 0 0 0 1.5-1.5h.092a4.502 4.502 0 0 0 4.406-4.125 4.48 4.48 0 0 0 0-4.758A4.502 4.502 0 0 0 13.592 9H13.5a1.5 1.5 0 0 0-1.5 1.5H7.5a1.5 1.5 0 0 0-1.5-1.5H6Z" />
     </svg>
 );
 
 
-// --- Main Chat Component ---
-const Chat = ({ token, onLogout }) => {
+const Chat = ({ token }) => {
+    const [pdfs, setPdfs] = useState([]);
+    const [selectedPdf, setSelectedPdf] = useState(null);
+    const [question, setQuestion] = useState('');
     const [messages, setMessages] = useState([]);
-    const [userInput, setUserInput] = useState('');
-    const [isBotTyping, setIsBotTyping] = useState(false);
-    const [isUploading, setIsUploading] = useState(false);
-    const [error, setError] = useState('');
-    const [userPdfs, setUserPdfs] = useState([]);
+    const [file, setFile] = useState(null);
+    const [isLoading, setIsLoading] = useState(false);
     
-    // --- New state for voice recording ---
-    const [isRecording, setIsRecording] = useState(false);
-    const [isProcessingVoice, setIsProcessingVoice] = useState(false); // New state for loading indicator
+    // --- NEW: Voice UI State ---
+    const [isListening, setIsListening] = useState(false);
+    const [isProcessing, setIsProcessing] = useState(false);
+    
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
 
-    const chatEndRef = useRef(null);
-    const fileInputRef = useRef(null);
-    const eventSourceRef = useRef(null);
-
-    const API_BASE_URL = 'http://localhost:8000/api';
-
-    const fetchUserPdfs = async () => {
-        try {
-            const response = await fetch(`${API_BASE_URL}/pdfs`, {
-                headers: { 'Authorization': `Bearer ${token}` }
-            });
-            if (!response.ok) throw new Error('Failed to fetch your documents.');
-            const data = await response.json();
-            setUserPdfs(data);
-            if (data.length > 0 && messages.length === 0) {
-                 setMessages([{ id: Date.now(), sender: 'bot', text: "Your documents are loaded and ready. Ask me anything about them!", sources: [] }]);
-            } else if (messages.length === 0) {
-                 setMessages([{ id: Date.now(), sender: 'bot', text: "Hello! Upload a PDF from the sidebar to get started.", sources: [] }]);
-            }
-        } catch (err) {
-            setError(err.message);
-        }
-    };
-
     useEffect(() => {
-        fetchUserPdfs();
-        return () => {
-            if (eventSourceRef.current) {
-                eventSourceRef.current.close();
+        const fetchPdfs = async () => {
+            if (!token) return;
+            try {
+                const response = await axios.get('http://localhost:8000/api/pdfs', {
+                    headers: { Authorization: `Bearer ${token}` }
+                });
+                setPdfs(response.data);
+                if (response.data.length > 0) {
+                    setSelectedPdf(response.data[0].id);
+                }
+            } catch (error) {
+                console.error('Failed to fetch PDFs', error);
             }
         };
+        fetchPdfs();
     }, [token]);
 
-    useEffect(() => {
-        chatEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-    }, [messages, isBotTyping, isProcessingVoice]);
-    
-    // --- New functions for voice recording ---
-    
-    const handleVoiceRecording = () => {
-        if (isRecording) {
-            mediaRecorderRef.current.stop();
-            setIsRecording(false);
-        } else {
-            navigator.mediaDevices.getUserMedia({ audio: true })
-                .then(stream => {
-                    const mediaRecorder = new MediaRecorder(stream);
-                    mediaRecorderRef.current = mediaRecorder;
-                    audioChunksRef.current = [];
-
-                    mediaRecorder.ondataavailable = event => {
-                        audioChunksRef.current.push(event.data);
-                    };
-
-                    mediaRecorder.onstop = async () => {
-                        const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-                        sendAudioToServer(audioBlob);
-                    };
-                    
-                    mediaRecorder.start();
-                    setIsRecording(true);
-                })
-                .catch(err => {
-                    setError("Microphone access was denied. Please allow access to use this feature.");
-                    console.error("Error accessing microphone:", err);
-                });
-        }
+    const handleFileChange = (e) => {
+        setFile(e.target.files[0]);
     };
 
-    const sendAudioToServer = async (audioBlob) => {
-        const formData = new FormData();
-        formData.append('file', audioBlob, 'recording.wav');
-
-        setIsProcessingVoice(true); // Start loading indicator
-        setError('');
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/ask_voice?token=${encodeURIComponent(token)}`, {
-                method: 'POST',
-                body: formData,
-            });
-            
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || 'Failed to process audio.');
-            }
-
-            const data = await response.json();
-
-            const userMessage = { id: Date.now(), sender: 'user', text: data.question };
-            const botMessage = { id: Date.now() + 1, sender: 'bot', text: data.answer, sources: data.sources };
-
-            setMessages(prev => [...prev, userMessage, botMessage]);
-
-        } catch (err) {
-            setError(`Voice Error: ${err.message}`);
-        } finally {
-            setIsProcessingVoice(false); // Stop loading indicator
-        }
-    };
-
-
-    const handleFileChange = async (event) => {
-        const file = event.target.files[0];
+    const handleFileUpload = async () => {
         if (!file) return;
-
-        setIsUploading(true);
-        setError('');
-
         const formData = new FormData();
         formData.append('file', file);
-
         try {
-            const response = await fetch(`${API_BASE_URL}/upload`, {
-                method: 'POST',
-                headers: { 'Authorization': `Bearer ${token}` },
-                body: formData,
-            });
-
-            if (!response.ok) {
-                const errData = await response.json();
-                throw new Error(errData.detail || 'Failed to upload PDF.');
-            }
-
-            setMessages(prev => [...prev, { id: Date.now(), sender: 'bot', text: `Successfully processed "${file.name}". Your knowledge base is updated.`, sources: [] }]);
-            fetchUserPdfs();
-
-        } catch (err) {
-            setError(`Upload Error: ${err.message}`);
-        } finally {
-            setIsUploading(false);
-            if(fileInputRef.current) {
-                fileInputRef.current.value = "";
-            }
-        }
-    };
-
-    const handleSendMessage = async (e) => {
-        e.preventDefault();
-        if (!userInput.trim() || isBotTyping || isUploading || isProcessingVoice) return;
-    
-        const question = userInput;
-        const userMessage = { id: Date.now(), sender: 'user', text: userInput };
-        const botMessageId = Date.now() + 1;
-    
-        setMessages(prev => [...prev, userMessage, { id: botMessageId, sender: 'bot', text: '', sources: [] }]);
-        setUserInput('');
-        setIsBotTyping(true);
-        setError('');
-    
-        if (eventSourceRef.current) {
-            eventSourceRef.current.close();
-        }
-    
-        const eventSource = new EventSource(`${API_BASE_URL}/ask?question=${encodeURIComponent(question)}&token=${encodeURIComponent(token)}`);
-        eventSourceRef.current = eventSource;
-    
-        eventSource.addEventListener('answer_chunk', (e) => {
-            const data = JSON.parse(e.data);
-            setMessages(prev =>
-                prev.map(msg =>
-                    msg.id === botMessageId
-                        ? { ...msg, text: msg.text + data.answer_chunk }
-                        : msg
-                )
-            );
-        });
-
-        eventSource.addEventListener('sources', (e) => {
-            const data = JSON.parse(e.data);
-            setMessages(prev =>
-                prev.map(msg =>
-                    msg.id === botMessageId
-                        ? { ...msg, sources: data.sources }
-                        : msg
-                )
-            );
-            setIsBotTyping(false);
-            eventSource.close();
-        });
-    
-        eventSource.onerror = (e) => {
-            setError("An error occurred with the streaming connection.");
-            setIsBotTyping(false);
-            eventSource.close();
-        };
-    };
-    
-
-    const handleFeedback = async (messageId, isHelpful) => {
-        const message = messages.find(msg => msg.id === messageId);
-        const questionMessage = messages.slice().reverse().find(msg => msg.id < messageId && msg.sender === 'user');
-
-        if (!message || !questionMessage || message.feedback !== undefined) return;
-
-        setMessages(prev => prev.map(msg =>
-            msg.id === messageId ? { ...msg, feedback: isHelpful } : msg
-        ));
-
-        try {
-            await fetch(`${API_BASE_URL}/feedback`, {
-                method: 'POST',
+            await axios.post('http://localhost:8000/api/pdfs', formData, {
                 headers: {
-                    'Content-Type': 'application/json',
-                    'Authorization': `Bearer ${token}`
-                },
-                body: JSON.stringify({
-                    question: questionMessage.text,
-                    answer: message.text,
-                    is_helpful: isHelpful
-                })
+                    'Content-Type': 'multipart/form-data',
+                    Authorization: `Bearer ${token}`
+                }
             });
-        } catch (err) {
-            setError("Failed to send feedback.");
+            const response = await axios.get('http://localhost:8000/api/pdfs', {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            setPdfs(response.data);
+            setFile(null);
+        } catch (error) {
+            console.error('File upload failed', error);
+        }
+    };
+
+    const addMessage = (text, sender) => {
+        setMessages(prev => [...prev, { text, sender }]);
+    };
+
+    const handleAskQuestion = async () => {
+        if (!question.trim() || !selectedPdf) return;
+        addMessage(question, 'user');
+        setIsLoading(true);
+        setQuestion('');
+        try {
+            const response = await axios.post('http://localhost:8000/api/ask', {
+                pdf_id: selectedPdf,
+                question: question
+            }, {
+                headers: { Authorization: `Bearer ${token}` }
+            });
+            addMessage(response.data.answer, 'ai');
+        } catch (error) {
+            console.error('Failed to ask question', error);
+            addMessage('Sorry, something went wrong.', 'ai');
+        } finally {
+            setIsLoading(false);
         }
     };
     
+    const sendAudioData = async (audioBlob) => {
+        if (!selectedPdf) {
+            addMessage('Please select a PDF before asking a question.', 'ai');
+            return;
+        }
+        setIsProcessing(true); // Start processing indicator
+        const formData = new FormData();
+        formData.append('audio', audioBlob, 'recording.wav');
+        formData.append('pdf_id', selectedPdf);
+        
+        try {
+            const response = await axios.post('http://localhost:8000/api/ask_voice', formData, {
+                headers: { 
+                    'Content-Type': 'multipart/form-data',
+                    Authorization: `Bearer ${token}` 
+                }
+            });
+            addMessage(response.data.question, 'user');
+            addMessage(response.data.answer, 'ai');
+        } catch (error) {
+            console.error('Failed to process voice question', error);
+            addMessage('Sorry, I couldn\'t process the audio.', 'ai');
+        } finally {
+            setIsProcessing(false); // Stop processing indicator
+        }
+    };
+
+    const handleVoiceClick = async () => {
+        if (isListening) {
+            mediaRecorderRef.current.stop();
+            setIsListening(false);
+        } else {
+            try {
+                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+                mediaRecorderRef.current = new MediaRecorder(stream);
+                audioChunksRef.current = [];
+                
+                mediaRecorderRef.current.ondataavailable = (event) => {
+                    audioChunksRef.current.push(event.data);
+                };
+                
+                mediaRecorderRef.current.onstop = () => {
+                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+                    sendAudioData(audioBlob);
+                    stream.getTracks().forEach(track => track.stop());
+                };
+                
+                mediaRecorderRef.current.start();
+                setIsListening(true);
+            } catch (error) {
+                console.error('Error accessing microphone', error);
+                addMessage('Microphone access denied.', 'ai');
+            }
+        }
+    };
+
+
     return (
-       <div className="flex h-screen bg-gray-900 text-white font-sans">
-            {/* Sidebar */}
-            <aside className="w-64 bg-gray-900/80 backdrop-blur-sm p-4 border-r border-cyan-500/20 flex flex-col">
-                <h2 className="text-xl font-bold text-transparent bg-clip-text bg-gradient-to-r from-cyan-400 to-blue-500 mb-6">Your Documents</h2>
-                <div className="flex-1 overflow-y-auto space-y-2 pr-2">
-                    {userPdfs.map(pdf => (
-                        <div key={pdf.id} className="p-2 bg-gray-800 rounded-md text-sm text-gray-300 truncate" title={pdf.fileName}>
-                            📄 {pdf.fileName}
+        <div className="flex h-screen bg-gray-100 font-sans">
+            <div className="w-1/4 flex-shrink-0 p-4 bg-white border-r">
+                <h2 className="mb-4 text-xl font-bold text-gray-800">Your Documents</h2>
+                <div className="mb-4">
+                    <input type="file" onChange={handleFileChange} className="block w-full text-sm text-gray-500 file:mr-4 file:py-2 file:px-4 file:rounded-full file:border-0 file:text-sm file:font-semibold file:bg-blue-50 file:text-blue-700 hover:file:bg-blue-100"/>
+                    <button onClick={handleFileUpload} disabled={!file} className="w-full px-4 py-2 mt-2 text-white bg-blue-500 rounded hover:bg-blue-600 disabled:bg-blue-300">Upload PDF</button>
+                </div>
+                <div className="space-y-2">
+                    {pdfs.map(pdf => (
+                        <div key={pdf.id} onClick={() => setSelectedPdf(pdf.id)} className={`p-2 rounded cursor-pointer transition-colors ${selectedPdf === pdf.id ? 'bg-blue-100 text-blue-800' : 'hover:bg-gray-50'}`}>
+                            {pdf.filename}
                         </div>
                     ))}
-                    {userPdfs.length === 0 && !isUploading && (
-                         <p className="text-sm text-gray-500">No documents uploaded yet.</p>
-                    )}
                 </div>
-                <div className="mt-auto">
-                     <input type="file" id="pdf-upload" accept=".pdf" onChange={handleFileChange} ref={fileInputRef} className="hidden" disabled={isUploading} />
-                     <label htmlFor="pdf-upload" className={`w-full text-center cursor-pointer block bg-gradient-to-r from-cyan-500 to-blue-600 hover:from-cyan-600 hover:to-blue-700 text-white font-bold py-2 px-4 rounded-lg transition-all shadow-md hover:shadow-lg ${isUploading ? 'opacity-50 cursor-not-allowed' : ''}`}>
-                        {isUploading ? 'Uploading...' : '+ Upload PDF'}
-                     </label>
-                </div>
-            </aside>
+            </div>
 
-            {/* Main Chat Area */}
-            <div className="flex-1 flex flex-col">
-                 <header className="bg-gray-900/80 backdrop-blur-sm p-4 border-b border-cyan-500/20 shadow-lg flex justify-between items-center">
-                    <h1 className="text-xl md:text-2xl font-bold">Chat Interface</h1>
-                     <button onClick={onLogout} className="p-2 rounded-md hover:bg-gray-700 transition-colors" title="Logout" aria-label="Logout">
-                         <LogoutIcon />
-                     </button>
-                 </header>
-                <main className="flex-1 overflow-y-auto p-4 md:p-6 space-y-6">
-                    {messages.map((msg) => (
-                        <div key={msg.id} className={`flex items-start gap-3 ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
-                            {msg.sender === 'bot' && <BotIcon />}
-                            <div className={`max-w-xl p-4 rounded-xl shadow-md break-words ${msg.sender === 'user' ? 'bg-blue-600 rounded-br-none' : 'bg-gray-700 rounded-bl-none'}`}>
-                               {msg.sender === 'bot' && !msg.text && isBotTyping ? (
-                                    <div className="flex items-center space-x-1">
-                                        <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-75"></span>
-                                        <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-150"></span>
-                                        <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-300"></span>
-                                    </div>
-                               ) : (
-                                <p className="whitespace-pre-wrap">{msg.text}</p>
-                               )}
-
-                               {msg.sources && msg.sources.length > 0 && (
-                                   <div className="mt-4 border-t border-gray-600 pt-2">
-                                       <h4 className="text-xs font-bold text-gray-400 mb-2">Sources:</h4>
-                                       {msg.sources.map((source, index) => (
-                                           <div key={index} className="mb-2 p-2 bg-gray-800 rounded-md text-xs text-gray-300">
-                                               <p className="font-bold">{source.file_name}</p>
-                                               <p className="italic mt-1">"{source.page_content}"</p>
-                                           </div>
-                                       ))}
-                                   </div>
-                               )}
-                               {msg.sender === 'bot' && msg.text && !isBotTyping && !isProcessingVoice && (
-                                   <div className="flex gap-2 mt-2">
-                                       <button onClick={() => handleFeedback(msg.id, true)} className={`p-1 rounded-full ${msg.feedback === true ? 'bg-green-500 text-white' : 'hover:bg-gray-600'}`} title="Helpful" aria-label="Helpful" disabled={msg.feedback !== undefined}><ThumbsUpIcon /></button>
-                                       <button onClick={() => handleFeedback(msg.id, false)} className={`p-1 rounded-full ${msg.feedback === false ? 'bg-red-500 text-white' : 'hover:bg-gray-600'}`} title="Not Helpful" aria-label="Not Helpful" disabled={msg.feedback !== undefined}><ThumbsDownIcon /></button>
-                                   </div>
-                               )}
-                            </div>
-                            {msg.sender === 'user' && <UserIcon />}
-                        </div>
-                    ))}
-
-                    {/* New Loading Indicator for Voice Processing */}
-                    {isProcessingVoice && (
-                        <div className="flex items-start gap-3 justify-start">
-                            <BotIcon />
-                            <div className="max-w-xl p-4 rounded-xl shadow-md bg-gray-700 rounded-bl-none">
-                                <div className="flex items-center space-x-1">
-                                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-75"></span>
-                                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-150"></span>
-                                    <span className="w-2 h-2 bg-cyan-400 rounded-full animate-pulse delay-300"></span>
-                                    <span className="ml-2 text-gray-300">Processing audio...</span>
+            <div className="flex flex-col flex-1">
+                <header className="p-4 font-bold text-center text-gray-700 bg-white border-b">
+                    {selectedPdf ? `Chatting with ${pdfs.find(p => p.id === selectedPdf)?.filename}` : 'Select a document to start'}
+                </header>
+                <div className="flex-1 p-4 overflow-y-auto bg-gray-50">
+                    <div className="space-y-4">
+                        {messages.map((msg, index) => (
+                            <div key={index} className={`flex ${msg.sender === 'user' ? 'justify-end' : 'justify-start'}`}>
+                                <div className={`max-w-lg px-4 py-2 rounded-lg shadow-md ${msg.sender === 'user' ? 'bg-blue-500 text-white' : 'bg-white text-gray-800'}`}>
+                                    {msg.text}
                                 </div>
                             </div>
-                        </div>
-                    )}
-
-                    <div ref={chatEndRef} />
-                </main>
-                <footer className="p-4 bg-gray-900/80 backdrop-blur-sm border-t border-cyan-500/20">
-                     <div className="max-w-3xl mx-auto">
-                        {error && <p className="text-red-400 text-center text-sm mb-2">{error}</p>}
-                        <form onSubmit={handleSendMessage} className="flex items-center gap-2">
-                             <input
-                                id="question-input"
-                                name="question"
-                                type="text"
-                                value={userInput}
-                                onChange={(e) => setUserInput(e.target.value)}
-                                placeholder="Ask a question about your documents..."
-                                className="flex-1 p-3 bg-gray-700 rounded-lg border border-gray-600 focus:outline-none focus:ring-2 focus:ring-cyan-500 disabled:bg-gray-800 disabled:cursor-not-allowed"
-                                disabled={isBotTyping || isUploading || userPdfs.length === 0 || isProcessingVoice}
-                            />
-                             <button
-                                type="submit"
-                                className="p-3 bg-gradient-to-r from-cyan-500 to-blue-600 rounded-lg disabled:opacity-50 disabled:cursor-not-allowed hover:from-cyan-600 hover:to-blue-700"
-                                disabled={isBotTyping || isUploading || !userInput.trim() || isProcessingVoice}
-                                title="Send Message"
-                                aria-label="Send Message"
-                            >
-                                <SendIcon />
-                            </button>
-                            { /* --- New Voice Input Button --- */ }
-                            <button
-                                type="button"
-                                onClick={handleVoiceRecording}
-                                className={`p-3 rounded-lg ${isRecording ? 'bg-red-600' : 'bg-gray-600'} hover:bg-gray-500 disabled:opacity-50 disabled:cursor-not-allowed`}
-                                disabled={isBotTyping || isUploading || userPdfs.length === 0 || isProcessingVoice}
-                                title={isRecording ? "Stop Recording" : "Start Recording"}
-                                aria-label={isRecording ? "Stop Recording" : "Start Recording"}
-                            >
-                                <MicrophoneIcon isRecording={isRecording} />
-                            </button>
-                        </form>
+                        ))}
+                        {/* --- NEW: Listening and Processing Indicators --- */}
+                        {isListening && <div className="text-center text-gray-500 animate-pulse">Listening...</div>}
+                        {isProcessing && <div className="text-center text-gray-500">Processing...</div>}
                     </div>
-                </footer>
+                </div>
+                <div className="p-4 bg-white border-t">
+                    <div className="flex items-center">
+                        <input
+                            type="text"
+                            value={question}
+                            onChange={(e) => setQuestion(e.target.value)}
+                            onKeyPress={(e) => e.key === 'Enter' && !isLoading && handleAskQuestion()}
+                            className="flex-1 p-2 border rounded-l-md focus:outline-none focus:ring-2 focus:ring-blue-500"
+                            placeholder={!selectedPdf ? "Please select a document first" : "Ask a question..."}
+                            disabled={!selectedPdf || isLoading}
+                        />
+                         <button onClick={handleVoiceClick} disabled={!selectedPdf || isLoading || isProcessing} className="p-2 border-t border-b bg-gray-50 hover:bg-gray-100 disabled:bg-gray-200">
+                            <MicIcon isRecording={isListening} />
+                        </button>
+                        <button onClick={handleAskQuestion} disabled={!selectedPdf || isLoading} className="px-4 py-2 text-white bg-green-500 rounded-r-md hover:bg-green-600 disabled:bg-green-300 flex items-center">
+                            {isLoading ? <Spinner /> : 'Ask'}
+                        </button>
+                    </div>
+                </div>
             </div>
-       </div>
+        </div>
     );
 };
 
