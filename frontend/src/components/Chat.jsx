@@ -36,6 +36,8 @@ const Chat = ({ token }) => {
     const [isPopoverOpen, setIsPopoverOpen] = useState(false);
     const [selectedLanguage, setSelectedLanguage] = useState('indian');
 
+    const [shouldStartRecording, setShouldStartRecording] = useState(false);
+
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
 
@@ -56,6 +58,17 @@ const Chat = ({ token }) => {
         };
         fetchPdfs();
     }, [token]);
+
+
+    useEffect(() => {
+    // This effect runs only when shouldStartRecording becomes true
+    if (shouldStartRecording) {
+      startRecording();
+      // Reset the trigger so it can be used again
+      setShouldStartRecording(false);
+    }
+  }, [shouldStartRecording]);
+
 
     const handleFileChange = (e) => {
         setFile(e.target.files[0]);
@@ -219,13 +232,14 @@ const Chat = ({ token }) => {
                                 <MicIcon isRecording={isListening} />
                             </button>
                             <LanguagePopover
-                                isOpen={isPopoverOpen}
-                                onSelectLanguage={(lang) => {
-                                    setSelectedLanguage(lang);
-                                    setIsPopoverOpen(false);
-                                    startRecording();
-                                }}
-                            />
+    isOpen={isPopoverOpen}
+    onSelectLanguage={(lang) => {
+        setSelectedLanguage(lang);
+        setIsPopoverOpen(false);
+        // This line is the fix. It uses the trigger instead of calling the function directly.
+        setShouldStartRecording(true);
+    }}
+/>
                         </div>
                         <button onClick={handleAskQuestion} disabled={!selectedPdf || isLoading} className="px-4 py-2 text-white bg-green-500 rounded-r-md hover:bg-green-600 disabled:bg-green-300 flex items-center">
                             {isLoading ? <Spinner /> : 'Ask'}
