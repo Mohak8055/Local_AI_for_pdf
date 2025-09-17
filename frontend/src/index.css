@@ -1,3 +1,36 @@
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
+
+
+/* frontend/src/index.css */
+
+.language-popover {
+  position: absolute;
+  bottom: 120%; /* Position it directly above the button */
+  left: 50%;
+  transform: translateX(-50%); /* Center it horizontally */
+  background-color: white;
+  border-radius: 8px;
+  padding: 8px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.15);
+  width: 150px; /* Set a fixed width */
+  border: 1px solid #e2e8f0;
+  z-index: 10;
+}
+
+.popover-option {
+  width: 100%;
+  padding: 8px 12px;
+  border-radius: 6px;
+  border: none;
+  background-color: transparent;
+  cursor: pointer;
+  font-size: 0.9rem;
+  text-align: center;
+  transition: background-color 0.2s;
+}
+
+.popover-option:hover {
+  background-color: #f1f5f9; /* A light gray for hover effect */
+}

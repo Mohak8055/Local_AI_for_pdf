@@ -1,7 +1,7 @@
 import React, { useState, useEffect, useRef } from 'react';
 import axios from 'axios';
+import LanguagePopover from './LanguagePopover';
 
-// --- NEW: Loading Spinner Component ---
 const Spinner = () => (
     <svg className="animate-spin -ml-1 mr-3 h-5 w-5 text-white" xmlns="http://www.w3.org/2000/svg" fill="none" viewBox="0 0 24 24">
         <circle className="opacity-25" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="4"></circle>
@@ -9,7 +9,6 @@ const Spinner = () => (
     </svg>
 );
 
-// Microphone Icon Component
 const MicIcon = ({ isRecording }) => (
     <svg
         xmlns="http://www.w3.org/2000/svg"
@@ -31,10 +30,12 @@ const Chat = ({ token }) => {
     const [file, setFile] = useState(null);
     const [isLoading, setIsLoading] = useState(false);
     
-    // --- NEW: Voice UI State ---
     const [isListening, setIsListening] = useState(false);
     const [isProcessing, setIsProcessing] = useState(false);
     
+    const [isPopoverOpen, setIsPopoverOpen] = useState(false);
+    const [selectedLanguage, setSelectedLanguage] = useState('indian');
+
     const mediaRecorderRef = useRef(null);
     const audioChunksRef = useRef([]);
 
@@ -49,7 +50,7 @@ const Chat = ({ token }) => {
                 if (response.data.length > 0) {
                     setSelectedPdf(response.data[0].id);
                 }
-            } catch (error) {
+            } catch (error) { // --- THIS IS THE FIX ---
                 console.error('Failed to fetch PDFs', error);
             }
         };
@@ -111,10 +112,11 @@ const Chat = ({ token }) => {
             addMessage('Please select a PDF before asking a question.', 'ai');
             return;
         }
-        setIsProcessing(true); // Start processing indicator
+        setIsProcessing(true);
         const formData = new FormData();
         formData.append('audio', audioBlob, 'recording.wav');
         formData.append('pdf_id', selectedPdf);
+        formData.append('language_model', selectedLanguage);
         
         try {
             const response = await axios.post('http://localhost:8000/api/ask_voice', formData, {
@@ -129,36 +131,40 @@ const Chat = ({ token }) => {
             console.error('Failed to process voice question', error);
             addMessage('Sorry, I couldn\'t process the audio.', 'ai');
         } finally {
-            setIsProcessing(false); // Stop processing indicator
+            setIsProcessing(false);
         }
     };
 
+    const startRecording = async () => {
+        try {
+            const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
+            mediaRecorderRef.current = new MediaRecorder(stream);
+            audioChunksRef.current = [];
+            
+            mediaRecorderRef.current.ondataavailable = (event) => {
+                audioChunksRef.current.push(event.data);
+            };
+            
+            mediaRecorderRef.current.onstop = () => {
+                const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
+                sendAudioData(audioBlob);
+                stream.getTracks().forEach(track => track.stop());
+            };
+            
+            mediaRecorderRef.current.start();
+            setIsListening(true);
+        } catch (error) {
+            console.error('Error accessing microphone', error);
+            addMessage('Microphone access denied.', 'ai');
+        }
+    };
+    
     const handleVoiceClick = async () => {
         if (isListening) {
             mediaRecorderRef.current.stop();
             setIsListening(false);
         } else {
-            try {
-                const stream = await navigator.mediaDevices.getUserMedia({ audio: true });
-                mediaRecorderRef.current = new MediaRecorder(stream);
-                audioChunksRef.current = [];
-                
-                mediaRecorderRef.current.ondataavailable = (event) => {
-                    audioChunksRef.current.push(event.data);
-                };
-                
-                mediaRecorderRef.current.onstop = () => {
-                    const audioBlob = new Blob(audioChunksRef.current, { type: 'audio/wav' });
-                    sendAudioData(audioBlob);
-                    stream.getTracks().forEach(track => track.stop());
-                };
-                
-                mediaRecorderRef.current.start();
-                setIsListening(true);
-            } catch (error) {
-                console.error('Error accessing microphone', error);
-                addMessage('Microphone access denied.', 'ai');
-            }
+            setIsPopoverOpen(!isPopoverOpen);
         }
     };
 
@@ -193,7 +199,6 @@ const Chat = ({ token }) => {
                                 </div>
                             </div>
                         ))}
-                        {/* --- NEW: Listening and Processing Indicators --- */}
                         {isListening && <div className="text-center text-gray-500 animate-pulse">Listening...</div>}
                         {isProcessing && <div className="text-center text-gray-500">Processing...</div>}
                     </div>
@@ -209,9 +214,19 @@ const Chat = ({ token }) => {
                             placeholder={!selectedPdf ? "Please select a document first" : "Ask a question..."}
                             disabled={!selectedPdf || isLoading}
                         />
-                         <button onClick={handleVoiceClick} disabled={!selectedPdf || isLoading || isProcessing} className="p-2 border-t border-b bg-gray-50 hover:bg-gray-100 disabled:bg-gray-200">
-                            <MicIcon isRecording={isListening} />
-                        </button>
+                         <div className="relative">
+                            <button onClick={handleVoiceClick} disabled={!selectedPdf || isLoading || isProcessing} className="p-2 border-t border-b bg-gray-50 hover:bg-gray-100 disabled:bg-gray-200">
+                                <MicIcon isRecording={isListening} />
+                            </button>
+                            <LanguagePopover
+                                isOpen={isPopoverOpen}
+                                onSelectLanguage={(lang) => {
+                                    setSelectedLanguage(lang);
+                                    setIsPopoverOpen(false);
+                                    startRecording();
+                                }}
+                            />
+                        </div>
                         <button onClick={handleAskQuestion} disabled={!selectedPdf || isLoading} className="px-4 py-2 text-white bg-green-500 rounded-r-md hover:bg-green-600 disabled:bg-green-300 flex items-center">
                             {isLoading ? <Spinner /> : 'Ask'}
                         </button>
