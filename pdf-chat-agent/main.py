@@ -1,3 +1,5 @@
+# pdf-chat-agent/main.py
+
 from fastapi import FastAPI, File, UploadFile, Form, Depends, HTTPException
 from fastapi.middleware.cors import CORSMiddleware
 from sqlalchemy.orm import Session
@@ -7,7 +9,7 @@ import tempfile
 from auth import oauth2_scheme
 import os
 import io
-from pydub import AudioSegment # Import pydub
+from pydub import AudioSegment
 
 # --- Setup Logging ---
 logging.basicConfig(level=logging.INFO)
@@ -35,7 +37,7 @@ def get_db():
     finally:
         db.close()
 
-# --- Authentication Routes ---
+# --- Authentication & PDF Routes (Unchanged) ---
 app.include_router(auth.router, prefix="/auth", tags=["auth"])
 
 @app.post("/auth/register", response_model=schemas.User)
@@ -45,7 +47,6 @@ def register_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
         raise HTTPException(status_code=400, detail="Email already registered")
     return database.create_user(db=db, user=user)
 
-# --- PDF Routes ---
 @app.post("/api/pdfs", response_model=schemas.PDF)
 async def upload_pdf(
     file: UploadFile = File(...),
@@ -75,7 +76,6 @@ async def get_pdfs(db: Session = Depends(get_db), token: str = Depends(oauth2_sc
         raise HTTPException(status_code=401, detail="Invalid authentication credentials")
     return database.get_pdfs_by_user(db, user.id)
 
-# --- RAG Routes ---
 @app.post("/api/ask")
 async def ask_question(
     request: schemas.QuestionRequest,
@@ -97,12 +97,15 @@ async def ask_question(
 
     return {"answer": result["result"]}
 
+
+# --- MODIFIED RAG Voice Route ---
 @app.post("/api/ask_voice")
 async def ask_voice(
     token: str = Depends(oauth2_scheme),
     audio: UploadFile = File(...),
     pdf_id: int = Form(...),
-    user_lang: str = Form("en"),
+    user_lang: str = Form("en-IN"),
+    language_model: str = Form(...), # <-- Accept the language model choice from frontend
     db: Session = Depends(get_db)
 ):
     user = await auth.get_current_user(token=token, db=db)
@@ -113,34 +116,35 @@ async def ask_voice(
     try:
         audio_bytes = await audio.read()
 
-        # --- FIX: Convert audio to WAV format using pydub ---
         with tempfile.NamedTemporaryFile(delete=False, suffix=".wav") as temp_audio_file:
-            # Load audio from bytes and export as WAV
             audio_segment = AudioSegment.from_file(io.BytesIO(audio_bytes))
             audio_segment.export(temp_audio_file.name, format="wav")
             temp_audio_path = temp_audio_file.name
 
-        question_text, detected_lang = rag_core.transcribe_audio(temp_audio_path)
-        
-        translated_question = rag_core.translate_text(question_text, "en", detected_lang)
+        # --- Use the new router function ---
+        translated_question, detected_lang = rag_core.transcribe_audio(temp_audio_path, language_model)
 
+        if not translated_question:
+            raise HTTPException(status_code=500, detail="Transcription failed for the selected model.")
+        
+        # Now, proceed with the RAG chain
         chunks_from_db = database.get_chunks_by_pdf(db, pdf_id)
         vector_store = rag_core.create_vector_store_from_db_chunks(chunks_from_db)
-        
+
         if not vector_store:
             raise HTTPException(status_code=404, detail="PDF not found or has no content.")
-            
+
         qa_chain = rag_core.get_qa_chain(vector_store)
         result = qa_chain.invoke({"query": translated_question})
-        
+
+        # Translate the final answer back to the user's language
         final_answer = rag_core.translate_text(result["result"], user_lang, "en")
-        
-        return {"answer": final_answer, "question": question_text}
+
+        return {"answer": final_answer, "question": translated_question}
 
     except Exception as e:
         logger.error(f"Error during voice processing: {e}")
         raise HTTPException(status_code=500, detail="Error processing voice query.")
     finally:
-        # Clean up the temporary file
         if temp_audio_path and os.path.exists(temp_audio_path):
             os.remove(temp_audio_path)

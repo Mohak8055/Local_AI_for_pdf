@@ -20,3 +20,4 @@ torchaudio
 librosa
 translators
 pydub
+sarvamai
